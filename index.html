@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Vaibhav Pandey </title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital@1&display=swap" rel="stylesheet">
+  
+  <!-- Vue.js & Three.js Ecosystem -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.128.0/examples/js/renderers/CSS3DRenderer.js"></script>
+
+  <style>
+    /* ─── Design Tokens & Strict Identity Variables ─────────────── */
+    :root {
+      --ink: #1b1d20;
+      --parchment: #f2f1ec;
+      --sand: #e1dfd8;
+      --electric-blue: #5196fe;
+      --ember-orange: #f9754e;
+      --font-functional: 'Inter', sans-serif;
+      --font-serif: 'Playfair Display', serif;
+      --window-anim: 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    
+    body {
+      background-color: var(--parchment);
+      color: var(--ink);
+      font-family: var(--font-functional);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* ─── Dual Renderer Setup ───────────────────────────────────── */
+    #css-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2; }
+    #webgl-container { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; pointer-events: none; }
+
+    /* ─── 3D Interaction Overlays ───────────────────────────────── */
+    .hint-toast {
+      position: fixed; left: 50%; transform: translateX(-50%); border-radius: 9999px;
+      font-weight: 600; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; z-index: 999;
+      padding: 12px 24px; font-size: 14px; backdrop-filter: blur(8px);
+    }
+    #exit-hint { top: 32px; background-color: rgba(27, 29, 32, 0.8); color: var(--parchment); border: 1px solid rgba(242, 241, 236, 0.1); }
+    #enter-hint { bottom: 48px; background-color: rgba(81, 150, 254, 0.9); color: var(--parchment); box-shadow: 0 12px 24px rgba(81, 150, 254, 0.3); }
+    
+    body.os-zoomed-in.system-on #exit-hint { opacity: 1; }
+    body.os-zoomed-out.system-on #enter-hint { opacity: 1; }
+
+    #power-overlay {
+      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+      z-index: 9999; display: flex; flex-direction: column; align-items: center;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    #power-overlay.hidden { opacity: 0; transform: translateX(-50%) translateY(20px); pointer-events: none; }
+
+    .pill-btn {
+      border-radius: 9999px; padding: 18px 40px; font-size: 16px; font-weight: 600;
+      background: var(--electric-blue); border: none; color: var(--parchment);
+      cursor: pointer; transition: all 0.2s ease; font-family: var(--font-functional);
+      box-shadow: 0 16px 32px rgba(81, 150, 254, 0.4); display: flex; align-items: center; gap: 12px;
+    }
+    .pill-btn:hover { background: #3a7ce0; transform: translateY(-4px); box-shadow: 0 20px 40px rgba(81, 150, 254, 0.5); }
+    .pill-btn svg { width: 20px; height: 20px; }
+
+    /* ─── The Portfolio OS Base ─────────────────────────────────── */
+    #portfolio-os {
+      width: 1440px; height: 900px; background-color: #050505;
+      overflow: hidden; position: relative; cursor: default;
+      transition: background-color 0.4s ease;
+    }
+
+    .os-layer {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; opacity: 0; pointer-events: none;
+      transition: opacity 0.6s ease;
+    }
+    .os-layer.active { opacity: 1; pointer-events: auto; }
+
+    /* BIOS / BOOT */
+    #layer-bios { background-color: var(--ink); color: var(--parchment); z-index: 100; }
+    .progress-track { width: 400px; height: 2px; background: rgba(242,241,236,0.1); border-radius: 9999px; margin: 32px 0 16px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--electric-blue); width: 0%; transition: width 0.1s; }
+    .bios-text { font-family: monospace; font-size: 16px; opacity: 0.8; letter-spacing: 0.05em; text-align: center; line-height: 1.5; }
+
+    /* LOGIN SCREEN */
+    #layer-login { background: linear-gradient(135deg, #1b1d20 0%, #0a0a0a 100%); color: var(--parchment); backdrop-filter: blur(20px); z-index: 90; }
+    .login-avatar {
+      width: 160px; height: 160px; border-radius: 9999px; background-color: var(--sand);
+      margin-bottom: 24px; box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+      background-image: url('vaibhav.png');
+      background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center;
+    }
+    .login-avatar svg { width: 80px; height: 80px; color: var(--electric-blue); opacity: 0.5; }
+    .login-name { font-size: 32px; font-weight: 600; margin-bottom: 32px; letter-spacing: -0.02em; }
+    .login-btn {
+      border-radius: 9999px; padding: 16px 48px; font-size: 16px; font-weight: 500;
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: var(--parchment);
+      cursor: pointer; transition: all 0.2s; font-family: var(--font-functional);
+    }
+    .login-btn:hover { background: var(--electric-blue); border-color: var(--electric-blue); transform: translateY(-2px); }
+
+    /* DESKTOP / WORKING OS */
+    #layer-desktop { justify-content: flex-start; align-items: stretch; z-index: 10; overflow: hidden; }
+    
+    .desktop-wallpaper {
+      position: absolute; inset: 0; z-index: 0; pointer-events: none;
+      background-image: url('Landscape.png');
+      background-size: fit; background-position: center; opacity: 0.25; mix-blend-mode: overlay;
+    }
+    
+    .desktop-area { flex: 1; position: relative; padding: 32px; padding-bottom: 80px; z-index: 1; display: flex; flex-direction: column; gap: 32px; flex-wrap: wrap; align-content: flex-start; }
+
+    /* App Icons */
+    .app-icon { width: 100px; display: flex; flex-direction: column; align-items: center; gap: 12px; cursor: pointer; transition: transform 0.2s; }
+    .app-icon:hover { transform: translateY(-2px); }
+    .app-icon-box {
+      width: 64px; height: 64px; border-radius: 16px; background-color: var(--parchment);
+      display: flex; align-items: center; justify-content: center; font-size: 28px; color: var(--electric-blue);
+      box-shadow: 0 12px 24px rgba(27, 29, 32, 0.2); transition: all 0.2s;
+    }
+    .app-icon:hover .app-icon-box { box-shadow: 0 16px 32px rgba(81, 150, 254, 0.3); }
+    .app-icon-label {
+      font-size: 14px; font-weight: 500; color: var(--parchment); text-align: center;
+      background: rgba(27, 29, 32, 0.6); padding: 4px 12px; border-radius: 9999px;
+    }
+
+    /* ─── FIXED WINDOWS TASKBAR ─── */
+    .taskbar {
+      position: absolute; bottom: 0; left: 0; width: 100%; height: 56px;
+      background-color: rgba(242, 241, 236, 0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      z-index: 9999; display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+      border-top: 1px solid rgba(27, 29, 32, 0.08); box-shadow: 0 -4px 20px rgba(0,0,0,0.05);
+    }
+
+    .taskbar-left { display: flex; align-items: center; gap: 8px; }
+
+    .taskbar-start-btn {
+      width: 40px; height: 40px; border-radius: 9999px; background: transparent;
+      display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s;
+    }
+    .taskbar-start-btn:hover { background: rgba(81, 150, 254, 0.15); }
+    .taskbar-start-btn svg { width: 20px; height: 22px; fill: var(--electric-blue); }
+
+    .taskbar-divider { width: 1px; height: 24px; background: rgba(27, 29, 32, 0.15); margin: 0 8px; }
+
+    .taskbar-apps { display: flex; gap: 8px; align-items: center; }
+    .taskbar-app {
+      padding: 6px 18px; border-radius: 9999px; font-size: 13px; font-weight: 600;
+      background-color: transparent; color: var(--ink); cursor: pointer;
+      transition: background 0.2s, color 0.2s; white-space: nowrap; position: relative;
+    }
+    .taskbar-app:hover { background-color: rgba(27, 29, 32, 0.06); }
+    
+    /* Active indicator in taskbar */
+    .taskbar-app::after {
+      content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+      width: 12px; height: 3px; border-radius: 99px; background-color: transparent; transition: background-color 0.2s;
+    }
+    .taskbar-app.active-app { background-color: var(--ink); color: var(--parchment); }
+    .taskbar-app.active-app::after { background-color: var(--electric-blue); }
+
+    /* ─── SYSTEM TRAY (Right Side) ─── */
+    .system-tray { display: flex; align-items: center; gap: 16px; }
+    .tray-icons { display: flex; align-items: center; gap: 12px; color: var(--ink); opacity: 0.85; }
+    .tray-icon-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; border-radius: 9999px; transition: background 0.2s; cursor: pointer;
+    }
+    .tray-icon-btn:hover { background: rgba(27,29,32,0.06); }
+    .tray-icon-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .tray-datetime {
+      display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+      font-size: 12px; font-weight: 600; color: var(--ink); line-height: 1.25; padding-left: 8px;
+      border-left: 1px solid rgba(27, 29, 32, 0.12); cursor: default;
+    }
+    .tray-time { opacity: 0.9; }
+    .tray-date { opacity: 0.6; font-size: 11px; }
+
+    /* Windows 11 Authentic Start Menu */
+    .start-menu {
+      position: absolute; bottom: 68px; left: 16px; width: 380px;
+      background: rgba(242, 241, 236, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-radius: 24px; box-shadow: 0 32px 80px rgba(5,5,5,0.3);
+      border: 1px solid rgba(225, 223, 216, 0.5); z-index: 10000;
+      opacity: 0; transform: translateY(20px) scale(0.95); pointer-events: none;
+      transition: var(--window-anim); transform-origin: bottom left;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .start-menu.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+    
+    .start-menu-body { padding: 32px; flex: 1; }
+    .start-menu-footer {
+      padding: 16px 32px; background: rgba(27,29,32,0.05); border-top: 1px solid rgba(27,29,32,0.05);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    
+    .start-user { display: flex; align-items: center; gap: 12px; }
+    .start-avatar {
+      width: 40px; height: 40px; border-radius: 9999px; background: var(--sand);
+      background-image: url('YOUR_PHOTO_URL_HERE.jpg'); background-size: cover; background-position: center;
+    }
+    .start-name { font-weight: 600; font-size: 14px; color: var(--ink); }
+    
+    .power-btn {
+      width: 40px; height: 40px; border-radius: 9999px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background 0.2s, color 0.2s; color: var(--ink);
+    }
+    .power-btn:hover { background: rgba(249, 117, 78, 0.15); color: var(--ember-orange); }
+
+    /* ─── OS Windows (Strict 24px Cards, 3 Control Buttons) ─── */
+    .os-window {
+      position: absolute; width: 850px; height: 600px;
+      background-color: var(--parchment); border-radius: 24px;
+      display: flex; flex-direction: column; box-shadow: 0 32px 80px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.5); overflow: hidden;
+      transition: transform var(--window-anim), opacity var(--window-anim), width var(--window-anim), height var(--window-anim), box-shadow 0.3s ease, border 0.3s ease;
+      transform-origin: center bottom;
+    }
+    
+    /* Interactive Window Focus States */
+    .os-window.is-focused {
+      box-shadow: 0 40px 100px rgba(81, 150, 254, 0.15), 0 0 0 1px var(--electric-blue);
+    }
+    
+    /* Minimize State */
+    .os-window.minimized { transform: translateY(500px) scale(0.1); opacity: 0; pointer-events: none; }
+    
+    /* Fullscreen / Maximize State */
+    .os-window.maximized {
+      width: 100% !important; height: calc(100% - 56px) !important;
+      top: 0 !important; left: 0 !important;
+      border-radius: 0 !important; box-shadow: none !important; border: none !important;
+    }
+    
+    .window-header {
+      height: 56px; background-color: var(--sand); border-bottom: 1px solid rgba(27,29,32,0.05);
+      display: flex; align-items: center; justify-content: space-between; padding: 0 20px; cursor: grab; flex-shrink: 0;
+    }
+    .window-header:active { cursor: grabbing; }
+    .window-title { font-weight: 600; font-size: 15px; color: var(--ink); pointer-events: none; }
+    
+    /* 3 Control Buttons: Minimize, Fullscreen/Maximize, Close */
+    .window-controls { display: flex; gap: 8px; align-items: center; }
+    .window-btn {
+      width: 28px; height: 28px; border-radius: 9999px; background-color: rgba(27, 29, 32, 0.08);
+      border: none; display: flex; align-items: center; justify-content: center; cursor: pointer;
+      transition: background 0.2s, color 0.2s; font-size: 13px; color: var(--ink); font-weight: 600;
+    }
+    .window-btn:hover { color: var(--parchment); }
+    .btn-min:hover { background-color: var(--electric-blue); }
+    .btn-max:hover { background-color: #3b82f6; }
+    .btn-close:hover { background-color: var(--ember-orange); }
+
+    .window-content {
+      overflow-y: auto; flex: 1; user-select: text; cursor: auto;
+      scrollbar-width: thin; scrollbar-color: var(--sand) transparent;
+      height: 100%;
+    }
+    .window-content::-webkit-scrollbar { width: 6px; }
+    .window-content::-webkit-scrollbar-thumb { background-color: #c9c7c0; border-radius: 9999px; }
+
+    /* ─── Typography & Content Inside Windows ───────────────────── */
+    h1 { font-size: 56px; letter-spacing: -0.10em; line-height: 1.05; font-weight: 600; margin-bottom: 20px; color: var(--ink); }
+    h1 em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--electric-blue); }
+    h2 { font-size: 40px; letter-spacing: -0.06em; line-height: 1.1; font-weight: 600; margin-bottom: 32px; color: var(--ink); }
+    h3 { font-size: 28px; letter-spacing: -0.03em; line-height: 1.2; font-weight: 600; margin-bottom: 14px; color: var(--ink); }
+    p { font-size: 17px; color: var(--ink); opacity: 0.85; text-align: left; margin-bottom: 20px; max-width: 640px; }
+
+    .tag {
+      border-radius: 9999px; padding: 6px 16px; font-size: 13px; font-weight: 500; display: inline-block;
+      margin: 0 6px 6px 0; background-color: rgba(27, 29, 32, 0.08); color: var(--ink);
+    }
+    
+    .inner-card { background-color: var(--sand); border-radius: 24px; padding: 32px; margin-bottom: 20px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+    .pill-orange {
+      border-radius: 9999px; padding: 16px 32px; font-size: 16px; font-weight: 600; text-decoration: none;
+      display: inline-flex; align-items: center; justify-content: center; border: none; cursor: pointer;
+      background-color: var(--ember-orange); color: var(--parchment); transition: transform 0.2s; margin-right: 12px; margin-bottom: 12px;
+    }
+    .pill-orange:hover { transform: translateY(-2px); }
+
+    .exp-item { margin-bottom: 36px; border-left: 2px solid rgba(27, 29, 32, 0.1); padding-left: 28px; position: relative; }
+    .exp-item::before { content: ''; position: absolute; left: -9px; top: 6px; width: 16px; height: 16px; border-radius: 9999px; background-color: var(--electric-blue); }
+    .exp-date { font-size: 13px; font-weight: 600; color: var(--electric-blue); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* ─── CHROME BROWSER UI (For Resume) ─── */
+    .chrome-browser { display: flex; flex-direction: column; width: 100%; height: 100%; background: #ffffff; }
+    .chrome-tabs { display: flex; background: #dee1e6; padding: 8px 16px 0; gap: 8px; border-bottom: 1px solid #ccc; }
+    .chrome-tab {
+      background: #ffffff; border-radius: 8px 8px 0 0; padding: 8px 16px; font-size: 12px; font-weight: 500;
+      display: flex; align-items: center; gap: 8px; width: 220px; color: #333; position: relative;
+    }
+    .chrome-tab::after {
+      content: '✕'; position: absolute; right: 12px; font-size: 10px; color: #777; cursor: pointer;
+    }
+    .chrome-nav { display: flex; align-items: center; padding: 8px 16px; background: #ffffff; border-bottom: 1px solid #e0e0e0; gap: 16px; }
+    .chrome-nav-icons { display: flex; gap: 12px; color: #5f6368; }
+    .chrome-url { flex: 1; background: #f1f3f4; border-radius: 9999px; padding: 6px 16px; font-size: 13px; color: #202124; }
+    .chrome-content { flex: 1; background: #525659; display: flex; justify-content: center; overflow: hidden; padding: 0; }
+    .dummy-pdf {
+      width: 100%; max-width: 700px; min-height: 900px; background: #ffffff; box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      padding: 60px; display: flex; flex-direction: column;
+    }
+    
+    .skeleton-title { height: 28px; width: 60%; background: #e0e0e0; margin-bottom: 32px; border-radius: 4px; }
+    .skeleton-line { height: 14px; width: 100%; background: #f0f0f0; margin-bottom: 16px; border-radius: 4px; }
+    .skeleton-line.short { width: 75%; margin-bottom: 32px; }
+    
+    .spinner { width: 36px; height: 36px; border: 4px solid rgba(255,255,255,0.2); border-radius: 50%; border-top-color: #ffffff; animation: spin 1s ease-in-out infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .anim-slide-up { animation: slideUp 0.6s cubic-bezier(0.165, 0.84, 0.44, 1) forwards; opacity: 0; transform: translateY(30px); }
+    @keyframes slideUp { to { opacity: 1; transform: translateY(0); } }
+
+    /* ════════════════════════════════════════════════════════════
+       MOBILE & RESPONSIVE OVERRIDES
+    ════════════════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      #webgl-container, #exit-hint, #enter-hint, #power-overlay { display: none !important; }
+      
+      #css-container, #css-container > div, #css-container > div > div {
+        perspective: none !important; transform: none !important; transform-style: flat !important;
+        width: 100% !important; height: 100% !important; position: static !important;
+      }
+      #css-container > div > div { position: absolute !important; top: 0 !important; left: 0 !important; }
+      #portfolio-os { width: 100vw !important; height: 100vh !important; position: absolute !important; top: 0 !important; left: 0 !important; transform: none !important; }
+      
+      .desktop-area { padding: 16px; gap: 16px; align-content: center; flex-direction: row; }
+      
+      .taskbar { position: absolute; bottom: 0; left: 0; width: 100%; padding: 0 12px; height: 52px; }
+      .taskbar-divider { display: none; }
+      .taskbar-apps { margin: 0; overflow-x: auto; }
+
+      .system-tray { gap: 8px; }
+      .tray-icon-btn { width: 28px; height: 28px; }
+      .tray-datetime { font-size: 10px; border-left: none; padding-left: 0; }
+      .tray-date { display: none; }
+
+      .start-menu { left: 8px; bottom: 60px; width: calc(100vw - 16px); }
+
+      .os-window {
+        width: 100vw !important; height: calc(100vh - 52px) !important;
+        top: 0 !important; left: 0 !important; border-radius: 0 !important; border: none !important;
+      }
+      .os-window.minimized { transform: translateY(100vh) !important; }
+      .window-header { cursor: default !important; }
+      .window-content { padding: 20px; }
+      
+      h1 { font-size: 36px; } h2 { font-size: 28px; } h3 { font-size: 22px; }
+      .grid-2 { grid-template-columns: 1fr; gap: 16px; }
+      .inner-card { padding: 20px; }
+    }
+  </style>
+</head>
+<body id="body-root" class="os-zoomed-out">
+
+<!-- Overlay Hints -->
+<div id="exit-hint" class="hint-toast">Click outside the screen to step back</div>
+<div id="enter-hint" class="hint-toast">System Running — Click screen to interact</div>
+
+<!-- Hardware Power Button Overlay -->
+<div id="power-overlay">
+  <button class="pill-btn" onclick="triggerPowerOn()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+    Power On Workstation
+  </button>
+</div>
+
+<!-- Dual Renderers -->
+<div id="webgl-container"></div>
+<div id="css-container"></div>
+
+<!-- The Interactive Vue.js OS -->
+<div id="portfolio-os">
+  <div id="app" style="width: 100%; height: 100%;" @mousemove="onDrag" @mouseup="stopDrag" @mouseleave="stopDrag">
+    
+    <!-- 1. BOOT LAYER -->
+    <div class="os-layer" id="layer-bios" :class="{ active: systemState === 'bios' }">
+      <div class="bios-text">VAIBHAV OS [Version 1.0.0]<br>(c) 2026 Vaibhav Pandey. All rights reserved.<br><br>Checking system memory... OK<br>Loading graphical interface...</div>
+      <div class="progress-track"><div class="progress-fill" :style="{ width: bootProgress + '%' }"></div></div>
+      <div class="bios-text">{{ bootText }}</div>
+    </div>
+
+    <!-- 2. LOGIN LAYER -->
+    <div class="os-layer" id="layer-login" :class="{ active: systemState === 'login' }">
+      <div class="login-avatar"></div>
+      <div class="login-name">Vaibhav Pandey</div>
+      <button class="login-btn" @click="login">Sign In</button>
+    </div>
+
+    <!-- 3. DESKTOP LAYER -->
+    <div class="os-layer" id="layer-desktop" :class="{ active: systemState === 'desktop' }">
+      <div class="desktop-wallpaper"></div>
+      
+      <!-- Desktop Icons -->
+      <div class="desktop-area" @click="startMenuOpen = false">
+        <div class="app-icon" v-for="app in apps" :key="app.id" @dblclick.stop="openWindow(app.id)" @click.stop="openWindow(app.id)">
+          <div class="app-icon-box">{{ app.icon }}</div>
+          <div class="app-icon-label">{{ app.label }}</div>
+        </div>
+
+        <!-- Windows -->
+        <div class="os-window" 
+             v-for="win in windowsData" 
+             :key="win.id"
+             :class="{ minimized: win.minimized, maximized: win.maximized, 'is-focused': win.zIndex === zIndexCounter }"
+             :style="{ left: (isMobile || win.maximized) ? 0 : win.x + 'px', top: (isMobile || win.maximized) ? 0 : win.y + 'px', zIndex: win.zIndex }"
+             @mousedown="bringToFront(win.id)">
+          
+          <!-- Window Header Bar -->
+          <div class="window-header" @mousedown="startWindowDrag($event, win.id)">
+            <div class="window-title">{{ win.id === 'resume' ? 'Resume.pdf - Google Chrome' : win.label }}</div>
+            <!-- All 3 Control Buttons -->
+            <div class="window-controls">
+              <button class="window-btn btn-min" title="Minimize" @click.stop="minimizeWindow(win.id)">–</button>
+              <button class="window-btn btn-max" title="Toggle Fullscreen" @click.stop="toggleMaximize(win.id)">{{ win.maximized ? '❐' : '□' }}</button>
+              <button class="window-btn btn-close" title="Close" @click.stop="closeWindow(win.id)">✕</button>
+            </div>
+          </div>
+
+          <div class="window-content" :style="{ padding: win.id === 'resume' ? '0' : '40px' }" @mousedown.stop>
+            
+            <!-- ABOUT MODULE -->
+            <div v-if="win.id === 'about'">
+             <h1 style="text-align: center;">Vaibhav pandey</h1>
+              <h2>Fresher. Builder.<br><em>Problem Solver.</em></h2>
+               <p>I'm a <strong>B.Tech Computer Science graduate</strong> (2026) from VMSB Uttarakhand Technical University, based in Ghaziabad. I operate at the intersection of networking, full-stack web dev, AI/ML, and blockchain.</p>
+        <p>From configuring <strong>Cisco routers & VLANs</strong> to deploying an <strong>AI job-match agent</strong> with Razorpay, and now building a <strong>decentralized e-voting system</strong> with face recognition — I bring depth across every layer of the stack.</p>
+        <p>I'm deep into <strong>LLMs, RAG pipelines, and agentic AI</strong> because the next decade belongs to engineers who can bridge distributed systems with intelligent decision-making.</p>
+              <h3 style="margin-top: 40px;">Capabilities</h3>
+              <div class="grid-2">
+                <div class="inner-card">
+                  <p style="font-weight: 600; margin-bottom: 8px;">AI & ML</p>
+                  <p style="font-size: 15px;">Intelligent pipelines, LLMs, RAG architectures, and data visualization.</p>
+                  <div class="tags"><span class="tag">Python</span><span class="tag">TensorFlow</span><span class="tag">Chart.js</span><span class="tag">RAG</span></div>
+                </div>
+                <div class="inner-card">
+                  <p style="font-weight: 600; margin-bottom: 8px;">Backend & APIs</p>
+                  <p style="font-size: 15px;">RESTful services, secure data flows, and cloud integration.</p>
+                  <div class="tags"><span class="tag">Flask</span><span class="tag">Firebase</span><span class="tag">SQL</span><span class="tag">Render</span></div>
+                </div>
+                <div class="inner-card">
+                  <p style="font-weight: 600; margin-bottom: 8px;">Frontend Architecture</p>
+                  <p style="font-size: 15px;">Building interactive interfaces to surface actionable insights.</p>
+                  <div class="tags"><span class="tag">React.js</span><span class="tag">Vue.js</span><span class="tag">Vuetify</span><span class="tag">JavaScript</span></div>
+                </div>
+                <div class="inner-card">
+                  <p style="font-weight: 600; margin-bottom: 8px;">Networking & Core</p>
+                  <p style="font-size: 15px;">LAN/WAN topology, routing, and real-time host monitoring.</p>
+                  <div class="tags"><span class="tag">Cisco IOS</span><span class="tag">TCP/IP</span><span class="tag">VLANs</span></div>
+                </div>
+                <div class="inner-card">
+                  <p style="font-weight: 600; margin-bottom: 8px;">Computer vision</p>
+                  <p style="font-size: 15px;">Biometric identity verification with Python face recognition for secure, liveness-aware authentication.</p>
+                  <div class="tags"><span class="tag">OpenCV</span><span class="tag">Python</span><span class="tag">dlib</span></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- PROJECTS MODULE -->
+            <div v-if="win.id === 'projects'">
+              <h2>Projects</h2>
+              <div class="inner-card" v-for="proj in projects" style="margin-bottom: 24px;">
+                <h3>{{ proj.title }}</h3>
+                <p>{{ proj.desc }}</p>
+                <div style="margin-top: 12px;">
+                  <span class="tag" v-for="tag in proj.tags">{{ tag }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- EXPERIENCE MODULE -->
+            <div v-if="win.id === 'experience'">
+              <h2>Experience</h2>
+              <div class="exp-item" v-for="exp in experience">
+                <div class="exp-date">{{ exp.date }}</div>
+                <h3 style="font-size: 24px;">{{ exp.role }} <span style="opacity: 0.6; font-weight: 400; font-size: 20px;">@ {{ exp.org }}</span></h3>
+                <p>{{ exp.desc }}</p>
+              </div>
+            </div>
+
+            <!-- CONTACT MODULE -->
+            <div v-if="win.id === 'contact'">
+              <div class="inner-card" style="text-align: center; padding: 56px 24px; margin-top: 20px;">
+                <h2>Contact</h2>
+                <p style="margin: 0 auto 28px auto; text-align: center;">Actively seeking full-time roles in Data Analysis, Web Development, or AI/ML. Open to impactful roles where data drives strategy.</p>
+                <a href="mailto:vaibhavpandey98477@gmail.com" class="pill-orange">✉️ Email Me</a>
+                <a href="https://linkedin.com/vaibhav1812" class="pill-orange" target="_blank">🔗 LinkedIn</a>
+                <a href="https://github.com/vaibhavpandey-web" class="pill-orange" target="_blank">🐙 GitHub</a>
+              </div>
+            </div>
+
+            <!-- RESUME MODULE (CHROME UI ANIMATION) -->
+            <div v-if="win.id === 'resume'" style="height: 100%;">
+              <div class="chrome-browser">
+                <div class="chrome-tabs">
+                  <div class="chrome-tab">
+                    <span style="font-size: 14px;">📄</span> Resume.pdf
+                  </div>
+                </div>
+                <div class="chrome-nav">
+                  <div class="chrome-nav-icons">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" opacity="0.3"><path d="M9 18l6-6-6-6"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                  </div>
+                  <div class="chrome-url">file:///C:/Users/Vaibhav/Documents/Resume.pdf</div>
+                </div>
+                
+                <div class="chrome-content">
+                  
+                  <!-- PDF Loading Animation State -->
+                  <div v-if="resumeLoading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #fff;">
+                    <div class="spinner" style="margin-bottom: 20px;"></div>
+                    <div style="font-weight: 500; font-size: 15px; opacity: 0.9;">Loading document...</div>
+                  </div> 
+                  <!-- Actual PDF Viewer State -->
+                  <div v-else class="anim-slide-up" style="width: 100%; height: 100%;">
+                    <iframe src="Vaibhav_Pandey.pdf" width="100%" height="100%" style="border: none; border-radius: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.5); background: white;">
+                    </iframe>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- FIXED TASKBAR AT BOTTOM -->
+      <div class="taskbar">
+        
+        <div class="taskbar-left">
+          <!-- Authentic Windows 11 Start Icon -->
+          <div class="taskbar-start-btn" @click.stop="startMenuOpen = !startMenuOpen" title="Start">
+            <svg viewBox="0 0 24 24">
+              <rect x="3" y="3" width="8" height="8" rx="1.5"/>
+              <rect x="13" y="3" width="8" height="8" rx="1.5"/>
+              <rect x="3" y="13" width="8" height="8" rx="1.5"/>
+              <rect x="13" y="13" width="8" height="8" rx="1.5"/>
+            </svg>
+          </div>
+          
+          <div class="taskbar-divider"></div>
+
+          <div class="taskbar-apps">
+            <div class="taskbar-app" v-for="win in windowsData" :key="'tb-'+win.id" :class="{ 'active-app': !win.minimized && win.zIndex === zIndexCounter }" @click="toggleWindow(win.id)">
+              {{ win.label }}
+            </div>
+          </div>
+        </div>
+
+        <!-- SYSTEM TRAY -->
+        <div class="system-tray">
+          <div class="tray-icons">
+            <div class="tray-icon-btn" title="Bluetooth Connected">
+              <svg viewBox="0 0 24 24">
+                <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+              </svg>
+            </div>
+            <div class="tray-icon-btn" title="Wi-Fi Signal: Excellent">
+              <svg viewBox="0 0 24 24">
+                <path d="M5 12.55a11 11 0 0 1 14 0"></path>
+                <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                <line x1="12" y1="20" x2="12.01" y2="20" stroke-width="3"></line>
+              </svg>
+            </div>
+          </div>
+
+          <div class="tray-datetime">
+            <div class="tray-time">{{ currentTime }}</div>
+            <div class="tray-date">{{ currentDate }}</div>
+          </div>
+        </div>
+
+        <!-- Windows 11 Start Menu -->
+        <div class="start-menu" :class="{ open: startMenuOpen }" @click.stop>
+          <div class="start-menu-body">
+            <h3 style="font-size: 15px; margin-bottom: 24px; color: var(--ink);">Pinned Apps</h3>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+              <div class="app-icon" v-for="app in apps" :key="'start-'+app.id" @click.stop="openWindow(app.id)" style="width: 64px;">
+                <div class="app-icon-box" style="width: 56px; height: 56px; font-size: 24px; box-shadow: none; border: 1px solid var(--sand);">{{ app.icon }}</div>
+                <div class="app-icon-label" style="font-size: 12px; background: transparent; color: var(--ink); padding: 0;">{{ app.label.split('.')[0] }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="start-menu-footer">
+            <div class="start-user">
+              <div class="start-avatar"></div>
+              <div class="start-name">Vaibhav Pandey</div>
+            </div>
+            <!-- Windows Power Button -->
+            <div class="power-btn" @click.stop="shutdownSystem" title="Shut Down System">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const IS_MOBILE = window.innerWidth <= 768;
+
+  // ─── VUE.JS OPERATING SYSTEM LOGIC ───
+  const { createApp } = Vue;
+  
+  const app = createApp({
+    data() {
+      return {
+        systemState: 'off', 
+        bootProgress: 0,
+        bootText: 'Loading Modules: 0%',
+        startMenuOpen: false,
+        currentTime: '',
+        currentDate: '',
+        isMobile: IS_MOBILE,
+        zIndexCounter: 100,
+        resumeLoading: true,
+        
+        draggingWindow: null,
+        winDragOffsetX: 0,
+        winDragOffsetY: 0,
+
+        apps: [
+          { id: 'about', label: 'Profile.exe', icon: '👤' },
+          { id: 'projects', label: 'Project.dir', icon: '📂' },
+          { id: 'experience', label: 'Experience.log', icon: '📝' },
+          { id: 'contact', label: 'Contact.sys', icon: '📧' },
+          { id: 'resume', label: 'Resume.pdf', icon: '📄' } 
+        ],
+        windowsData: [],
+        projects: [
+          { title: 'Decentralized E-Voting', desc: 'Tamper-proof blockchain-based voting where every ballot is an immutable on-chain transaction. Python face recognition ensures biometric identity verification before voting. Built with a Vue.js frontend.', tags: ['Vue.js', 'Blockchain', 'Face Recognition','Python'] },
+          { title: 'PG Renting System', desc: 'A complete accommodation management web app enabling secure user authentication and streamlined property listings. Built leveraging a component-based frontend approach.', tags: ['Vue.js', 'Vuetify', 'Firebase'] },
+          { title: 'Signal — AI Job-Match Agent', desc: 'LLM-powered resume-to-JD matching with a credit-based monetization model. Flask backend, Firebase Firestore, Razorpay payments — fully deployed on Render with real-time AI scoring.', tags: ['Flask','Data Extraction', 'Python', 'LLMs'] },
+          { title: 'Network Operations Dashboard', desc: 'Real-time host monitoring with a glassmorphic UI. Tracks latency, packet loss, and uptime across multiple nodes using live OS ping, visualized with trend charts.', tags: ['Vue.js', 'Flask', 'Networking'] }
+        ],
+        experience: [
+          { role: 'Front End Developer Intern', org: 'Basti Ki Pathshala', date: 'Started January 5, 2025', desc: 'Optimized digital learning data architectures for underprivileged students, prioritizing data transfer performance on low-bandwidth mobile connections.' },
+          { role: 'Frontend Developer Intern ', org: 'Buildtech India Construction', date: 'Started Jun 1, 2025', desc: 'Analyzed construction KPIs and structured live data pipelines. Developed visual dashboards to surface actionable insights.' }
+        ]
+      }
+    },
+    computed: { openWindows() { return this.windowsData; } },
+    mounted() {
+      this.updateClock();
+      setInterval(this.updateClock, 1000);
+      window.addEventListener('resize', () => { this.isMobile = window.innerWidth <= 768; });
+      
+      if (this.isMobile) setTimeout(this.startBootSequence, 500);
+      window.addEventListener('hardware-power-on', this.startBootSequence);
+    },
+    methods: {
+      updateClock() {
+        const d = new Date();
+        this.currentTime = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        this.currentDate = d.toLocaleDateString([], { day: '2-digit', month: '2-digit', year: 'numeric' });
+      },
+      startBootSequence() {
+        if(this.systemState !== 'off') return;
+        this.systemState = 'bios';
+        this.bootProgress = 0;
+        this.bootText = 'Loading Modules...';
+        
+        const interval = setInterval(() => {
+          this.bootProgress += Math.floor(Math.random() * 20) + 10;
+          this.bootText = `Loading Modules: ${Math.min(this.bootProgress, 100)}%`;
+          if (this.bootProgress >= 100) {
+            this.bootProgress = 100;
+            clearInterval(interval);
+            setTimeout(() => { this.systemState = 'login'; }, 600);
+          }
+        }, 120);
+      },
+      login() {
+        this.systemState = 'desktop';
+        if(this.windowsData.length === 0) {
+          setTimeout(() => { this.openWindow('about'); }, 800);
+        }
+      },
+      shutdownSystem() {
+        this.startMenuOpen = false;
+        this.systemState = 'bios';
+        this.bootProgress = 100;
+        this.bootText = 'Shutting down system...';
+        this.windowsData = []; 
+        
+        setTimeout(() => {
+          this.systemState = 'off';
+          window.dispatchEvent(new Event('hardware-power-off'));
+        }, 1500);
+      },
+      openWindow(id) {
+        this.startMenuOpen = false;
+        
+        // Trigger Chrome PDF loading animation for the resume window
+        if (id === 'resume') {
+          this.resumeLoading = true;
+          setTimeout(() => {
+            this.resumeLoading = false;
+          }, 1500);
+        }
+
+        const win = this.windowsData.find(w => w.id === id);
+        if (win) {
+          win.minimized = false;
+          this.bringToFront(id);
+          return;
+        }
+        
+        const app = this.apps.find(a => a.id === id);
+        const offset = this.windowsData.length * 40;
+        this.zIndexCounter++;
+        this.windowsData.push({
+          id: id, label: app.label,
+          x: this.isMobile ? 0 : 280 + offset, 
+          y: this.isMobile ? 0 : 60 + offset, 
+          zIndex: this.zIndexCounter,
+          minimized: false,
+          maximized: false
+        });
+      },
+      closeWindow(id) {
+        this.windowsData = this.windowsData.filter(w => w.id !== id);
+      },
+      minimizeWindow(id) {
+        const win = this.windowsData.find(w => w.id === id);
+        if(win) win.minimized = true;
+      },
+      toggleMaximize(id) {
+        const win = this.windowsData.find(w => w.id === id);
+        if (win) {
+          win.maximized = !win.maximized;
+          if (win.maximized) win.minimized = false;
+          this.bringToFront(id);
+        }
+      },
+      toggleWindow(id) {
+        const win = this.windowsData.find(w => w.id === id);
+        if(!win) return;
+        if(win.minimized) {
+          win.minimized = false;
+          this.bringToFront(id);
+        } else {
+          if(win.zIndex === this.zIndexCounter) win.minimized = true;
+          else this.bringToFront(id);
+        }
+      },
+      bringToFront(id) {
+        this.zIndexCounter++;
+        const win = this.windowsData.find(w => w.id === id);
+        if (win) win.zIndex = this.zIndexCounter;
+      },
+      
+      startWindowDrag(e, id) {
+        if (this.isMobile) return;
+        const win = this.windowsData.find(w => w.id === id);
+        if (win && !win.maximized) {
+          this.bringToFront(id);
+          this.draggingWindow = win;
+          this.winDragOffsetX = e.clientX - win.x;
+          this.winDragOffsetY = e.clientY - win.y;
+        }
+      },
+      onDrag(e) {
+        if (this.draggingWindow && !this.isMobile && !this.draggingWindow.maximized) {
+          const maxX = 1440 - 850; 
+          const maxY = 900 - 600 - 56; 
+          let newX = e.clientX - this.winDragOffsetX;
+          let newY = e.clientY - this.winDragOffsetY;
+          
+          this.draggingWindow.x = Math.max(0, Math.min(newX, maxX));
+          this.draggingWindow.y = Math.max(0, Math.min(newY, maxY));
+        }
+      },
+      stopDrag() {
+        this.draggingWindow = null;
+      }
+    }
+  });
+  
+  app.mount('#app');
+
+  // ─── THREE.JS DUAL-RENDERER (Corporate Setup) ───
+  let scene, camera, webglRenderer, cssRenderer;
+  const screenW = 36, screenH = 22.5;
+
+  let isPoweredOn = false;
+  let cameraState = 'idle';
+
+  const camStartPos = new THREE.Vector3(0, 15, 75);
+  const camStartLook = new THREE.Vector3(0, 8, 0);
+  const camZoomPos = new THREE.Vector3(0, 14, 29); 
+  const camZoomLook = new THREE.Vector3(0, 14, 0);  
+
+  const currentCamPos = new THREE.Vector3().copy(camStartPos);
+  const currentLook = new THREE.Vector3().copy(camStartLook);
+
+  function init3D() {
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0xf2f1ec, 0.008); 
+    
+    camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 400);
+    camera.position.copy(camStartPos);
+    camera.lookAt(currentLook);
+
+    webglRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    webglRenderer.setSize(window.innerWidth, window.innerHeight);
+    webglRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    webglRenderer.shadowMap.enabled = true;
+    webglRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    webglRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+    webglRenderer.toneMappingExposure = 1.0;
+    
+    document.getElementById('webgl-container').appendChild(webglRenderer.domElement);
+
+    cssRenderer = new THREE.CSS3DRenderer();
+    cssRenderer.setSize(window.innerWidth, window.innerHeight);
+    document.getElementById('css-container').appendChild(cssRenderer.domElement);
+
+    // ─── MATERIALS ───
+    const whitePlastic = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0.1, clearcoat: 0.2 });
+    const blackMetal = new THREE.MeshPhysicalMaterial({ color: 0x111111, roughness: 0.6, metalness: 0.7 });
+    const silverMetal = new THREE.MeshPhysicalMaterial({ color: 0xcccccc, roughness: 0.3, metalness: 0.9, clearcoat: 0.5 });
+    const deskWood = new THREE.MeshPhysicalMaterial({ color: 0xd2b48c, roughness: 0.7, metalness: 0.0 });
+    const temperedGlass = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0.1, roughness: 0.05, transmission: 0.9, transparent: true });
+    
+    const carpetMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 1.0 });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 1.0 });
+
+    const roomGroup = new THREE.Group();
+    scene.add(roomGroup);
+
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), carpetMat);
+    floor.rotation.x = -Math.PI / 2; floor.position.y = -29;
+    floor.receiveShadow = true;
+    roomGroup.add(floor);
+
+    const backWall = new THREE.Mesh(new THREE.PlaneGeometry(400, 150), wallMat);
+    backWall.position.set(0, 30, -40);
+    backWall.receiveShadow = true;
+    roomGroup.add(backWall);
+
+    const deskGroup = new THREE.Group();
+    scene.add(deskGroup);
+
+    const deskTop = new THREE.Mesh(new THREE.BoxGeometry(80, 1.5, 35), deskWood);
+    deskTop.position.set(0, -1, 0);
+    deskTop.castShadow = true; deskTop.receiveShadow = true;
+    deskGroup.add(deskTop);
+
+    // ─── HARDWARE ADDITIONS ───
+    
+    // 1. Keyboard
+    const keyboardGroup = new THREE.Group();
+    keyboardGroup.position.set(0, -0.2, 7);
+    scene.add(keyboardGroup);
+    const kbBase = new THREE.Mesh(new THREE.BoxGeometry(16, 0.3, 5.5), silverMetal);
+    kbBase.castShadow = true;
+    const kbKeys = new THREE.Mesh(new THREE.BoxGeometry(15.2, 0.2, 4.7), blackMetal);
+    kbKeys.position.y = 0.15;
+    keyboardGroup.add(kbBase, kbKeys);
+
+    // 2. Mouse (Magic Mouse Shape)
+    const mouseGroup = new THREE.Group();
+    mouseGroup.position.set(11, 0, 7.5);
+    scene.add(mouseGroup);
+    const mouseGeo = new THREE.SphereGeometry(1.2, 32, 16);
+    const mouseMesh = new THREE.Mesh(mouseGeo, whitePlastic);
+    mouseMesh.scale.set(1, 0.3, 1.5);
+    mouseMesh.castShadow = true;
+    mouseGroup.add(mouseMesh);
+
+    // 3. Speakers
+    const coneMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+    function createSpeaker(x) {
+      const spk = new THREE.Group();
+      spk.position.set(x, 2.5, -2);
+      spk.rotation.y = x < 0 ? 0.2 : -0.2;
+      const box = new THREE.Mesh(new THREE.BoxGeometry(4, 7, 4.5), blackMetal);
+      box.castShadow = true;
+      spk.add(box);
+      const woofer = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.2, 32), coneMat);
+      woofer.rotation.x = Math.PI / 2;
+      woofer.position.set(0, -1.2, 2.3);
+      spk.add(woofer);
+      const tweeter = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.2, 32), coneMat);
+      tweeter.rotation.x = Math.PI / 2;
+      tweeter.position.set(0, 2, 2.3);
+      spk.add(tweeter);
+      return spk;
+    }
+    scene.add(createSpeaker(-18));
+    scene.add(createSpeaker(18));
+
+    // 4. PC Tower
+    const towerGroup = new THREE.Group();
+    towerGroup.position.set(26, 8.5, 0);
+    scene.add(towerGroup);
+    const towerFrame = new THREE.Mesh(new THREE.BoxGeometry(9, 18, 18), blackMetal);
+    towerFrame.castShadow = true;
+    towerGroup.add(towerFrame);
+    const glassPanel = new THREE.Mesh(new THREE.PlaneGeometry(17.8, 17.8), temperedGlass);
+    glassPanel.position.set(-4.51, 0, 0);
+    glassPanel.rotation.y = -Math.PI / 2;
+    towerGroup.add(glassPanel);
+    window.internalGlowMat = new THREE.MeshBasicMaterial({ color: 0x050505 });
+    const gpuGlow = new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.2, 11.8), window.internalGlowMat);
+    gpuGlow.position.set(0, -3.2, 0);
+    towerGroup.add(gpuGlow);
+    const fan1 = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.2, 8, 24), window.internalGlowMat);
+    fan1.position.set(0, 4, 8.8);
+    towerGroup.add(fan1);
+    const fan2 = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.2, 8, 24), window.internalGlowMat);
+    fan2.position.set(0, 0, 8.8);
+    towerGroup.add(fan2);
+
+    // 5. Indoor Snake Plant
+    const plantGroup = new THREE.Group();
+    plantGroup.position.set(-26, -0.2, -4);
+    scene.add(plantGroup);
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 2.5, 7, 32), whitePlastic);
+    pot.position.y = 3.5;
+    pot.castShadow = true;
+    plantGroup.add(pot);
+    const soil = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 0.5, 32), new THREE.MeshStandardMaterial({color: 0x1a1511}));
+    soil.position.y = 6.8;
+    plantGroup.add(soil);
+    const snakeLeafMat = new THREE.MeshPhysicalMaterial({ color: 0x3d5e31, roughness: 0.4, clearcoat: 0.2 });
+    const leafGeo = new THREE.CylinderGeometry(0.1, 1.2, 12, 8);
+    for(let i=0; i<8; i++) {
+      const leaf = new THREE.Mesh(leafGeo, snakeLeafMat);
+      leaf.scale.set(1, 1, 0.15); // Stretched and flattened for realistic snake plant shape
+      leaf.position.set((Math.random()-0.5)*2.5, 12 + (Math.random()*2), (Math.random()-0.5)*2.5);
+      leaf.rotation.x = (Math.random() - 0.5) * 0.4;
+      leaf.rotation.z = (Math.random() - 0.5) * 0.6;
+      leaf.rotation.y = Math.random() * Math.PI;
+      leaf.castShadow = true;
+      plantGroup.add(leaf);
+    }
+
+    // ─── MONITOR SETUP ───
+    const monitorGroup = new THREE.Group();
+    monitorGroup.position.set(0, 0, -2);
+    scene.add(monitorGroup);
+
+    const monitorBase = new THREE.Mesh(new THREE.BoxGeometry(10, 0.4, 6), silverMetal);
+    monitorBase.position.set(0, 0, -3);
+    monitorBase.castShadow = true;
+    monitorGroup.add(monitorBase);
+
+    const monitorArm = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 10), silverMetal);
+    monitorArm.position.set(0, 5, -4);
+    monitorArm.rotation.x = 0.1;
+    monitorArm.castShadow = true;
+    monitorGroup.add(monitorArm);
+    
+    const bezel = new THREE.Mesh(new THREE.BoxGeometry(screenW + 0.8, screenH + 0.8, 0.6), blackMetal);
+    bezel.position.set(0, 14, 0);
+    bezel.castShadow = true;
+    monitorGroup.add(bezel);
+    
+    const screenHoleMat = new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0, blending: THREE.NoBlending });
+    const webglScreen = new THREE.Mesh(new THREE.PlaneGeometry(screenW, screenH), screenHoleMat);
+    webglScreen.position.set(0, 14, 0.31);
+    monitorGroup.add(webglScreen);
+
+    const osElement = document.getElementById('portfolio-os');
+    const cssObject = new THREE.CSS3DObject(osElement);
+    cssObject.scale.set(0.025, 0.025, 0.025);
+    cssObject.position.set(0, 14, 0.30);
+    monitorGroup.add(cssObject);
+
+    // ─── LIGHTING ───
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444455, 0.8);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6); 
+    dirLight.position.set(100, 60, 20);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    scene.add(dirLight);
+
+    window.screenLight = new THREE.SpotLight(0x5196fe, 0, 100, 1.2, 1, 1);
+    window.screenLight.position.set(0, 14, 2);
+    scene.add(window.screenLight);
+
+    window.pcLight = new THREE.PointLight(0x5196fe, 0, 35);
+    window.pcLight.position.set(22, 8.5, 0);
+    scene.add(window.pcLight);
+
+    animate();
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    
+    if (cameraState === 'zooming_in') {
+      currentCamPos.lerp(camZoomPos, 0.035);
+      currentLook.lerp(camZoomLook, 0.035);
+      if (currentCamPos.distanceTo(camZoomPos) < 0.1) {
+        cameraState = 'zoomed_in';
+        document.getElementById('body-root').classList.remove('os-zoomed-out');
+        document.getElementById('body-root').classList.add('os-zoomed-in');
+      }
+    } else if (cameraState === 'zooming_out') {
+      currentCamPos.lerp(camStartPos, 0.035);
+      currentLook.lerp(camStartLook, 0.035);
+      if (currentCamPos.distanceTo(camStartPos) < 0.1) {
+        cameraState = 'zoomed_out';
+        document.getElementById('body-root').classList.remove('os-zoomed-in');
+        document.getElementById('body-root').classList.add('os-zoomed-out');
+      }
+    }
+    
+    camera.position.copy(currentCamPos);
+    camera.lookAt(currentLook);
+    
+    cssRenderer.render(scene, camera);
+    webglRenderer.render(scene, camera);
+  }
+
+  window.triggerPowerOn = function() {
+    if(isPoweredOn) return;
+    document.getElementById('power-overlay').classList.add('hidden');
+    
+    isPoweredOn = true;
+    document.getElementById('body-root').classList.add('system-on');
+    
+    if (window.internalGlowMat) window.internalGlowMat.color.setHex(0x5196fe);
+    if (window.screenLight) window.screenLight.intensity = 1.5; 
+    if (window.pcLight) window.pcLight.intensity = 2.0;
+    
+    window.dispatchEvent(new Event('hardware-power-on'));
+    cameraState = 'zooming_in';
+  };
+
+  if (!IS_MOBILE) {
+    document.getElementById('css-container').addEventListener('mousedown', (e) => {
+      if (!isPoweredOn) return;
+      
+      const osDOM = document.getElementById('portfolio-os');
+      const clickedInsideOS = osDOM.contains(e.target);
+
+      if (cameraState === 'zoomed_in' && !clickedInsideOS) {
+        cameraState = 'zooming_out';
+        document.getElementById('body-root').classList.remove('os-zoomed-in');
+      } 
+      else if ((cameraState === 'zoomed_out' || cameraState === 'idle') && clickedInsideOS) {
+        cameraState = 'zooming_in';
+        document.getElementById('body-root').classList.remove('os-zoomed-out');
+      }
+    });
+  }
+
+  window.addEventListener('hardware-power-off', () => {
+    isPoweredOn = false;
+    document.getElementById('body-root').classList.remove('system-on');
+    
+    if (!IS_MOBILE) {
+      if(window.internalGlowMat) window.internalGlowMat.color.setHex(0x050505);
+      if(window.screenLight) window.screenLight.intensity = 0; 
+      if(window.pcLight) window.pcLight.intensity = 0;
+      cameraState = 'zooming_out';
+      document.getElementById('body-root').classList.remove('os-zoomed-in');
+    }
+    
+    setTimeout(() => {
+      document.getElementById('power-overlay').classList.remove('hidden');
+    }, 1500); 
+  });
+
+  window.addEventListener('resize', () => {
+    if (!IS_MOBILE && camera && webglRenderer && cssRenderer) {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      webglRenderer.setSize(window.innerWidth, window.innerHeight);
+      cssRenderer.setSize(window.innerWidth, window.innerHeight);
+    }
+  });
+
+  if (!IS_MOBILE) {
+    init3D();
+  }
+</script>
+</body>
+</html>
