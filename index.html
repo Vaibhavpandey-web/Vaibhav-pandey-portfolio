@@ -1093,6 +1093,8 @@
     animate();
   }
 
+  let targetFov = 40; // Add this line right above animate() to track zoom level
+
   function animate() {
     requestAnimationFrame(animate);
     
@@ -1107,11 +1109,18 @@
     } else if (cameraState === 'zooming_out') {
       currentCamPos.lerp(camStartPos, 0.035);
       currentLook.lerp(camStartLook, 0.035);
+      targetFov = 40; // Automatically reset zoom when stepping away from the PC
       if (currentCamPos.distanceTo(camStartPos) < 0.1) {
         cameraState = 'zoomed_out';
         document.getElementById('body-root').classList.remove('os-zoomed-in');
         document.getElementById('body-root').classList.add('os-zoomed-out');
       }
+    }
+    
+    // Smoothly apply the pinch-to-zoom FOV changes
+    if (Math.abs(camera.fov - targetFov) > 0.05) {
+      camera.fov += (targetFov - camera.fov) * 0.15;
+      camera.updateProjectionMatrix();
     }
     
     camera.position.copy(currentCamPos);
@@ -1183,6 +1192,45 @@
   if (!IS_MOBILE) {
     init3D();
   }
+  // ─── PINCH-TO-ZOOM STRICTLY FOR MOBILE VIEW ───
+  let initialPinchDistance = null;
+  let initialTargetFov = null;
+
+  document.getElementById('css-container').addEventListener('touchstart', (e) => {
+    // Only activate on mobile screens (<= 768px), using 2 fingers, while viewing the screen
+    if (window.innerWidth <= 768 && e.touches.length === 2 && cameraState === 'zoomed_in') {
+      initialPinchDistance = Math.hypot(
+        e.touches[0].pageX - e.touches[1].pageX,
+        e.touches[0].pageY - e.touches[1].pageY
+      );
+      initialTargetFov = targetFov;
+    }
+  }, { passive: false });
+
+  document.getElementById('css-container').addEventListener('touchmove', (e) => {
+    if (window.innerWidth <= 768 && e.touches.length === 2 && initialPinchDistance && cameraState === 'zoomed_in') {
+      e.preventDefault(); // Stop the default browser from zooming the whole page
+      
+      const currentDistance = Math.hypot(
+        e.touches[0].pageX - e.touches[1].pageX,
+        e.touches[0].pageY - e.touches[1].pageY
+      );
+      
+      const scale = initialPinchDistance / currentDistance;
+      let newFov = initialTargetFov * scale;
+      
+      // Restrict zoom limits (12 = maximum zoom in, 40 = default zoom out)
+      newFov = Math.max(12, Math.min(newFov, 40)); 
+      
+      targetFov = newFov;
+    }
+  }, { passive: false });
+
+  document.getElementById('css-container').addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) {
+      initialPinchDistance = null;
+    }
+  });
 </script>
 </body>
 </html>
