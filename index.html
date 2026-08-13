@@ -326,10 +326,58 @@
     /* ════════════════════════════════════════════════════════════
        MOBILE & RESPONSIVE OVERRIDES
     ════════════════════════════════════════════════════════════ */
-   
+   /* ─── LANDSCAPE PROMPT FOR MOBILE ─── */
+    #landscape-prompt {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background-color: var(--ink);
+      color: var(--parchment);
+      z-index: 9999999; /* Highest z-index to cover everything */
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 32px;
+    }
+
+    #landscape-prompt svg {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 24px;
+      animation: rotate-phone 2.5s ease-in-out infinite;
+      color: var(--electric-blue);
+    }
+
+    @keyframes rotate-phone {
+      0% { transform: rotate(0deg); }
+      30% { transform: rotate(-90deg); }
+      70% { transform: rotate(-90deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    /* Only show this screen if the device is a mobile phone AND held vertically */
+    @media (max-width: 768px) and (orientation: portrait) {
+      #landscape-prompt {
+        display: flex;
+      }
+      /* Prevent scrolling in the background while the prompt is active */
+      body {
+        overflow: hidden !important;
+      }
+    }
   </style>
 </head>
 <body id="body-root" class="os-zoomed-out">
+  <!-- Landscape Prompt Overlay -->
+<div id="landscape-prompt">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+    <line x1="12" y1="18" x2="12.01" y2="18"></line>
+  </svg>
+  <h2 style="font-size: 24px; margin-bottom: 12px; color: #f2f1ec;">Please Rotate Your Device</h2>
+  <p style="font-size: 16px; opacity: 0.8; max-width: 300px;">This 3D workspace requires a landscape view for the best experience.</p>
+</div>
 
 <!-- Overlay Hints -->
 <div id="exit-hint" class="hint-toast">Click outside the screen to step back</div>
