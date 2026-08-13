@@ -110,9 +110,11 @@
     #layer-desktop { justify-content: flex-start; align-items: stretch; z-index: 10; overflow: hidden; }
     
     .desktop-wallpaper {
-      position: absolute; inset: 0; z-index: 0; pointer-events: none;
-      background-image: url('Landscape.png');
-      background-size: fit; background-position: center; opacity: 0.25; mix-blend-mode: overlay;
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: url('images.jpg');
+      background-position: center;
+      background-size:cover; background-position: center;background-repeat: no-repeat; 
+      mix-blend-mode: overlay;
     }
     
     .desktop-area { flex: 1; position: relative; padding: 32px; padding-bottom: 80px; z-index: 1; display: flex; flex-direction: column; gap: 32px; flex-wrap: wrap; align-content: flex-start; }
@@ -127,7 +129,7 @@
     }
     .app-icon:hover .app-icon-box { box-shadow: 0 16px 32px rgba(81, 150, 254, 0.3); }
     .app-icon-label {
-      font-size: 14px; font-weight: 500; color: var(--parchment); text-align: center;
+    font-size: 14px; font-weight: 500; color: var(--parchment); text-align: center;
       background: rgba(27, 29, 32, 0.6); padding: 4px 12px; border-radius: 9999px;
     }
 
@@ -467,26 +469,40 @@
             </div>
 
             <!-- PROJECTS MODULE -->
-            <div v-if="win.id === 'projects'">
-              <h2>Projects</h2>
-              <div class="inner-card" v-for="proj in projects" style="margin-bottom: 24px;">
-                <h3>{{ proj.title }}</h3>
-                <p>{{ proj.desc }}</p>
-                <div style="margin-top: 12px;">
-                  <span class="tag" v-for="tag in proj.tags">{{ tag }}</span>
-                </div>
-              </div>
-            </div>
-
+<div v-if="win.id === 'projects'">
+  <h2>Projects</h2>
+  <div class="inner-card" v-for="proj in projects" :key="proj.title" style="margin-bottom: 24px;">
+    <h3>{{ proj.title }}</h3>
+    
+    <!-- Render bullet list if array, otherwise render standard paragraph -->
+    <ul v-if="Array.isArray(proj.desc)" style="margin-top: 12px; padding-left: 20px; line-height: 1.6;">
+      <li v-for="(bullet, index) in proj.desc" :key="index" style="margin-bottom: 8px; font-size: 15px; color: var(--ink); opacity: 0.85;">
+        {{ bullet }}
+      </li>
+    </ul>
+    <p v-else>{{ proj.desc }}</p>
+    
+    <div style="margin-top: 16px;">
+      <span class="tag" v-for="tag in proj.tags" :key="tag">{{ tag }}</span>
+    </div>
+  </div>
+</div>
             <!-- EXPERIENCE MODULE -->
-            <div v-if="win.id === 'experience'">
-              <h2>Experience</h2>
-              <div class="exp-item" v-for="exp in experience">
-                <div class="exp-date">{{ exp.date }}</div>
-                <h3 style="font-size: 24px;">{{ exp.role }} <span style="opacity: 0.6; font-weight: 400; font-size: 20px;">@ {{ exp.org }}</span></h3>
-                <p>{{ exp.desc }}</p>
-              </div>
-            </div>
+<div v-if="win.id === 'experience'">
+  <h2>Experience</h2>
+  <div class="exp-item" v-for="exp in experience" :key="exp.role">
+    <div class="exp-date">{{ exp.date }}</div>
+    <h3 style="font-size: 24px;">{{ exp.role }} <span style="opacity: 0.6; font-weight: 400; font-size: 20px;">@ {{ exp.org }}</span></h3>
+    
+    <!-- Render bullet list if array, otherwise render standard paragraph -->
+    <ul v-if="Array.isArray(exp.desc)" style="margin-top: 12px; padding-left: 20px; line-height: 1.6;">
+      <li v-for="(bullet, index) in exp.desc" :key="index" style="margin-bottom: 8px; font-size: 16px; color: var(--ink); opacity: 0.85;">
+        {{ bullet }}
+      </li>
+    </ul>
+    <p v-else>{{ exp.desc }}</p>
+  </div>
+</div>
 
             <!-- CONTACT MODULE -->
             <div v-if="win.id === 'contact'">
@@ -642,16 +658,73 @@
           { id: 'resume', label: 'Resume.pdf', icon: '📄' } 
         ],
         windowsData: [],
-        projects: [
-          { title: 'Decentralized E-Voting', desc: 'Tamper-proof blockchain-based voting where every ballot is an immutable on-chain transaction. Python face recognition ensures biometric identity verification before voting. Built with a Vue.js frontend.', tags: ['Vue.js', 'Blockchain', 'Face Recognition','Python'] },
-          { title: 'PG Renting System', desc: 'A complete accommodation management web app enabling secure user authentication and streamlined property listings. Built leveraging a component-based frontend approach.', tags: ['Vue.js', 'Vuetify', 'Firebase'] },
-          { title: 'Signal — AI Job-Match Agent', desc: 'LLM-powered resume-to-JD matching with a credit-based monetization model. Flask backend, Firebase Firestore, Razorpay payments — fully deployed on Render with real-time AI scoring.', tags: ['Flask','Data Extraction', 'Python', 'LLMs'] },
-          { title: 'Network Operations Dashboard', desc: 'Real-time host monitoring with a glassmorphic UI. Tracks latency, packet loss, and uptime across multiple nodes using live OS ping, visualized with trend charts.', tags: ['Vue.js', 'Flask', 'Networking'] }
-        ],
-        experience: [
-          { role: 'Front End Developer Intern', org: 'Basti Ki Pathshala', date: 'Started January 5, 2025', desc: 'Optimized digital learning data architectures for underprivileged students, prioritizing data transfer performance on low-bandwidth mobile connections.' },
-          { role: 'Frontend Developer Intern ', org: 'Buildtech India Construction', date: 'Started Jun 1, 2025', desc: 'Analyzed construction KPIs and structured live data pipelines. Developed visual dashboards to surface actionable insights.' }
-        ]
+     projects: [
+  { 
+    title: 'Decentralized E-Voting', 
+    desc: [
+      'Developed a secure, decentralized electronic voting prototype integrating blockchain technology to guarantee vote immutability and structural correctness.',
+      'Implemented facial recognition methods to eliminate identity fraud and securely authenticate voters in real-time.',
+      'Designed smart contracts to automate vote recording and result tallying, removing the need for a centralized trusted authority'
+    ], 
+    tags: ['Vue.js', 'Blockchain', 'Face Recognition', 'Python'] 
+  },
+  { 
+    title: 'PG Renting System', 
+    desc: [
+      'A complete accommodation management web app enabling secure user authentication.',
+      'Streamlined property listings built leveraging a component-based frontend approach.'
+    ], 
+    tags: ['Vue.js', 'Vuetify', 'Firebase'] 
+  },
+    { 
+      title: 'AI-Powered Resume Screening Assistant', 
+      desc: [
+        ' Built an AI assistant that parses resumes and job descriptions, then leverages a Large Language Model with Retrieval-Augmented Generation (RAG) to rank candidate-role fit and surface skill gaps.',
+        'Applied NLP techniques for text extraction and semantic matching, and used vector-based retrieval to ground LLM responses in actual resume content, reducing irrelevant or hallucinated outputs.',
+        'Designed a modular pipeline separating parsing, embedding, and ranking stages, making the system easy to extend to new document formats and roles.'
+      ], 
+      tags: ['Python', 'LLM', 'RAG','NLP'] 
+    },
+  {
+    title: 'Signal — AI Job-Match Agent', 
+    desc: [
+      'LLM-powered resume-to-JD matching with a credit-based monetization model.',
+      'Flask backend, Firebase Firestore, and Razorpay payments integration.',
+      'Fully deployed on Render with real-time AI scoring.'
+    ], 
+    tags: ['Flask', 'Data Extraction', 'Python', 'LLMs'] 
+  },
+  { 
+    title: 'Network Operations Dashboard', 
+    desc: [
+      'Real-time host monitoring with a glassmorphic UI.',
+      'Tracks latency, packet loss, and uptime across multiple nodes using live OS ping.',
+      'Visualized network health with dynamic trend charts.'
+    ], 
+    tags: ['Vue.js', 'Flask', 'Networking'] 
+  },
+],
+       experience: [
+  { 
+    role: 'Front End Developer Intern', 
+    org: 'Basti Ki Pathshala', 
+    date: 'From Aug to Oct, 2025', 
+    desc: ['Spearheaded the implementation of modern front-end frameworks to optimize     application performance, load times, and core website functionality.',
+    'Debugged and resolved cross-browser rendering issues, improving consistency of the user interface across Chrome, Firefox, and Edge.',
+     'Worked directly with a non-technical team to translate feature requirements into functional, easy-to-navigate web pages.'] 
+  },
+  { 
+    role: 'Frontend Developer Intern', 
+    org: 'Buildtech India Construction', 
+    date: 'From Jun to Aug , 2025', 
+    desc: [
+      'Engineered user-friendly and interactive web interfaces utilizing HTML, CSS, and JavaScript, significantly enhancing overall user experience and engagement.',
+      'Collaborated closely with UI/UX designers to architect responsive layouts across various device profiles, ensuring strict adherence to accessibility and cross-platform usability standards.',
+      'Refactored legacy page components into reusable, modular code, improving maintainability and cutting new-feature implementation time for the team.',
+      'Used Git for version control and participated in code reviews, ensuring clean commit history and smoother collaboration across the development cycle.'
+    ]
+  }
+]
       }
     },
     computed: { openWindows() { return this.windowsData; } },
